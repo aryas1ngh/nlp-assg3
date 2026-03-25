@@ -1,20 +1,19 @@
 import os
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from typing import Tuple
 from tqdm import tqdm
 
 from tokenizer import get_split_files, read_files, encode, BOS_ID
 
 DEFAULT_CONTEXT = 256
-DEFAULT_STRIDE = 1  # stride=1 → maximum overlap; increase to save RAM
+DEFAULT_STRIDE = 1  # stride=1 maximum overlap, increase to save RAM
 CORPUS_DIR = "hindi_corpus/train"
 
 
 class HindiCorpusDataset(Dataset):
     """
     Language modelling dataset over the Hindi corpus.
-
     Each item is (x, y) — both LongTensors of shape (context_length,).
     y is x shifted right by one token (next-token prediction).
     """
@@ -34,7 +33,7 @@ class HindiCorpusDataset(Dataset):
         file_list = train_files if split == 'train' else val_files
         print(f"[HindiCorpusDataset] {split}: {len(file_list):,} files")
 
-        # Check for cached dataset to bypass tokenization overhead
+        # check for cached dataset to bypass tokenization overhead
         cache_path = os.path.join(corpus_dir, f"{split}_cache.pt")
         if os.path.exists(cache_path):
             print(f"[HindiCorpusDataset] Loading cached {split} data from {cache_path}")
@@ -43,7 +42,7 @@ class HindiCorpusDataset(Dataset):
                   f"{len(self):,} samples (stride={stride})")
             return
 
-        # Tokenise all files; prepend BOS per document
+        # tokenize, prepend BOS per document
         print(f"[HindiCorpusDataset] Tokenising {split} files …")
         all_ids = []
         for path in tqdm(file_list, desc=f"Tokenising {split}"):
@@ -63,7 +62,7 @@ class HindiCorpusDataset(Dataset):
                 "Try a smaller context_length or use more data."
             )
 
-        # Store as a flat tensor for fast slicing
+        # store as a flat tensor for fast slicing
         self._data = torch.tensor(all_ids, dtype=torch.long)
         print(f"[HindiCorpusDataset] Saving tokenized cache to {cache_path}")
         torch.save(self._data, cache_path)
@@ -86,15 +85,13 @@ def get_corpus_loaders(context_length: int = DEFAULT_CONTEXT,
                        num_workers: int = 0,
                        corpus_dir: str = CORPUS_DIR):
     """Build and return (train_loader, val_loader)."""
-    from torch.utils.data import DataLoader
+    
 
     train_ds = HindiCorpusDataset('train', context_length, stride, corpus_dir)
     val_ds = HindiCorpusDataset('val', context_length, stride, corpus_dir)
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size,
-                              shuffle=True, num_workers=num_workers)
-    val_loader = DataLoader(val_ds, batch_size=batch_size,
-                            shuffle=False, num_workers=num_workers)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     return train_loader, val_loader
 
 
@@ -106,4 +103,4 @@ if __name__ == '__main__':
     print(f"x[:5]   : {x[:5].tolist()}")
     print(f"y[:5]   : {y[:5].tolist()}")
     assert (x[1:] == y[:-1]).all(), "y must be x shifted by 1!"
-    print("Shift check passed ✓")
+    print("Shift check passed.")

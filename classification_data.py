@@ -5,7 +5,7 @@ from collections import defaultdict, Counter
 from typing import List, Tuple, Dict
 
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from tokenizer import encode, PAD_ID, clean_text
 
@@ -15,7 +15,7 @@ TRAIN_RATIO = 0.9
 RANDOM_SEED = 42
 
 TEXT_COL = 'text'
-LABEL_COL = 'experience'  # 0 = Negative, 1 = Neutral, 2 = Positive
+LABEL_COL = 'experience'  # 0 = neg, 1 = neutral, 2 = pos
 
 
 def _load_csv(csv_path: str) -> List[Dict[str, str]]:
@@ -40,7 +40,7 @@ def _stratified_split(rows: List[Dict],
         train_rows.extend(bucket[:n_train])
         val_rows.extend(bucket[n_train:])
 
-    # Re-shuffle so samples aren't class-sorted
+    # re-shuffle so samples are not class-sorted
     rng.shuffle(train_rows)
     rng.shuffle(val_rows)
     return train_rows, val_rows
@@ -55,14 +55,10 @@ def _pad_or_truncate(ids: List[int], max_length: int) -> List[int]:
 class ClassificationDataset(Dataset):
     """
     Sentiment classification dataset for Hindi movie reviews.
-
     Returns (x, y): x is a LongTensor of shape (max_length,), y is an int in {0, 1, 2}.
     """
 
-    def __init__(self,
-                 split: str = 'train',
-                 max_length: int = MAX_LENGTH,
-                 csv_path: str = CSV_PATH):
+    def __init__(self, split: str = 'train', max_length: int = MAX_LENGTH, csv_path: str = CSV_PATH):
         assert split in ('train', 'val'), "split must be 'train' or 'val'"
 
         self.max_length = max_length
@@ -75,11 +71,12 @@ class ClassificationDataset(Dataset):
         label_counts = Counter(r[LABEL_COL] for r in rows)
         print(f"[ClassificationDataset] {split} label distribution: {dict(label_counts)}")
 
+        # tokenize the text and pad/truncate to max_length
         self._samples: List[Tuple[torch.Tensor, int]] = []
         for row in rows:
             text = clean_text(row.get(TEXT_COL, ''))
             label = int(row[LABEL_COL])
-            ids = encode(text)
+            ids = encode(text, add_bos=True)
             ids = _pad_or_truncate(ids, max_length)
             x = torch.tensor(ids, dtype=torch.long)
             self._samples.append((x, label))
@@ -90,21 +87,18 @@ class ClassificationDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
         return self._samples[idx]
 
-
 def get_classification_loaders(max_length: int = MAX_LENGTH,
                                 batch_size: int = 32,
                                 num_workers: int = 0,
                                 csv_path: str = CSV_PATH):
     """Build and return (train_loader, val_loader)."""
-    from torch.utils.data import DataLoader
+    
 
     train_ds = ClassificationDataset('train', max_length, csv_path)
     val_ds = ClassificationDataset('val', max_length, csv_path)
 
-    train_loader = DataLoader(train_ds, batch_size=batch_size,
-                              shuffle=True, num_workers=num_workers)
-    val_loader = DataLoader(val_ds, batch_size=batch_size,
-                            shuffle=False, num_workers=num_workers)
+    train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     return train_loader, val_loader
 
 
@@ -117,4 +111,4 @@ if __name__ == '__main__':
     assert x.shape == (128,), "x must be shape (max_length,)"
     assert y in (0, 1, 2), "label must be in {0, 1, 2}"
     assert x.dtype == torch.long
-    print("All checks passed ✓")
+    print("Data is prepared.")

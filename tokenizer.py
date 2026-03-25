@@ -15,31 +15,20 @@ RANDOM_SEED = 42
 
 # Special token IDs assigned by SentencePiece trainer:
 #   0 = <unk> / PAD,  1 = <s> (BOS),  2 = </s> (EOS)
-# pad_id is disabled in the trainer (-1); we reuse UNK as PAD.
+# pad_id is disabled in the trainer, we reuse UNK as PAD.
 UNK_ID = 0
 BOS_ID = 1
 EOS_ID = 2
-PAD_ID = 0  # same as UNK; mask pads in attention when building the model
+PAD_ID = 0  # same as UNK, mask pads in attention when building the model
 
 
 def clean_text(text: str) -> str:
-    """
-    Keep only Devanagari script + Hindi punctuation + whitespace.
-    This ensures no English characters, digits, or symbols slip into the vocab.
-
-    Kept character classes:
-      \\u0900-\\u097F  — Devanagari block (all Hindi letters, matras, numerals)
-      \\u0964-\\u0965  — Devanagari danda (।) and double danda (॥)
-      \\n\\r\\t          — newlines / tabs (normalised to spaces below)
-      space            — word separator
-    """
     # Retain only Devanagari + digits + whitespace
     text = re.sub(r'[^\u0900-\u097F0-9\s]', ' ', text)
     # Collapse runs of whitespace
     text = re.sub(r'[ \t\r]+', ' ', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
-
 
 def get_split_files(corpus_dir: str = CORPUS_DIR,
                     train_ratio: float = TRAIN_RATIO,
@@ -75,7 +64,7 @@ def train_tokenizer(corpus_dir: str = CORPUS_DIR,
     train_files, _ = get_split_files(corpus_dir)
     print(f"Training tokenizer on {len(train_files)} files …")
 
-    # Dump all training text into a temp file for SentencePiece
+    # dump all training text into a temp file for SentencePiece
     with tempfile.NamedTemporaryFile(mode='w', suffix='.txt',
                                      encoding='utf-8', delete=False) as tmp:
         tmp_path = tmp.name
@@ -106,7 +95,7 @@ def train_tokenizer(corpus_dir: str = CORPUS_DIR,
     finally:
         os.remove(tmp_path)
 
-    print(f"Tokenizer saved → {model_prefix}.model  (vocab_size={vocab_size})")
+    print(f"Tokenizer saved to {model_prefix}.model  (vocab_size={vocab_size})")
 
 
 # Module-level singleton so we only load the model once
@@ -163,13 +152,13 @@ if __name__ == '__main__':
 
     if args.train:
         train_tokenizer(args.corpus_dir, args.vocab_size, args.model_prefix)
-    else:
-        # Quick demo
-        tok = get_tokenizer()
-        sample = "मेरा नाम अर्या है और मुझे फिल्में देखना पसंद है।"
-        ids = encode(sample)
-        decoded = decode(ids)
-        print(f"Sample : {sample}")
-        print(f"IDs    : {ids[:10]} … (len={len(ids)})")
-        print(f"Decoded: {decoded}")
-        print(f"Vocab  : {vocab_size()} tokens")
+    
+    # demo
+    tok = get_tokenizer()
+    sample = "मेरा नाम आर्य है और मुझे फिल्में देखना पसंद है।"
+    ids = encode(sample)
+    decoded = decode(ids)
+    print(f"Sample : {sample}")
+    print(f"IDs    : {ids[:10]} … (len={len(ids)})")
+    print(f"Decoded: {decoded}")
+    print(f"Vocab  : {vocab_size()} tokens")
