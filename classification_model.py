@@ -38,8 +38,18 @@ class GPTClassifier(nn.Module):
     def forward(self, idx: torch.Tensor, targets: torch.Tensor = None):
         # idx shape: (B, T)
         hidden = self.backbone(idx)        # (B, T, C)
-        # Sequence Alignment: Extract last token's features
-        last_hidden = hidden[:, -1, :]     # (B, C)
+        
+        # Sequence Alignment: Extract last REAL token's features (first non-pad from the right)
+        # For Right Padding, find the index of the last non-PAD token
+        non_pad_mask = (idx != 0) # Assuming 0 is PAD_ID (PAD_ID=0)
+        lengths = non_pad_mask.sum(dim=1) - 1
+        lengths = torch.clamp(lengths, min=0) # Handle empty sequences if any
+        
+        # Gather the features at the last non-pad positions
+        # hidden has shape (B, T, C), we want (B, C)
+        batch_indices = torch.arange(idx.size(0), device=idx.device)
+        last_hidden = hidden[batch_indices, lengths] # (B, C)
+        
         logits = self.clf_head(last_hidden) # (B, num_classes)
         
         loss = None

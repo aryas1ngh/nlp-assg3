@@ -48,6 +48,7 @@ def _stratified_split(rows: List[Dict],
 
 def _pad_or_truncate(ids: List[int], max_length: int) -> List[int]:
     ids = ids[:max_length]
+    # Right Padding (better for positional embeddings)
     ids += [PAD_ID] * (max_length - len(ids))
     return ids
 
