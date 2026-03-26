@@ -6,6 +6,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import random
+
+# For reproducibility
+torch.manual_seed(42)
+random.seed(42)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(42)
 
 from language_model import MiniGPT, DEVICE, CONTEXT_LENGTH, EMBED_DIM, NUM_HEADS, NUM_LAYERS, FFN_DIM
 DROPOUT = 0.3
@@ -114,6 +121,16 @@ def evaluate_classifier(model, loader):
 def save_plots(history, output_dir='plots'):
     os.makedirs(output_dir, exist_ok=True)
     
+    # Save Metrics JSON (Dynamic)
+    import json
+    with open('classification_metrics.json', 'w') as f:
+        json.dump({
+            "history": history,
+            "final_acc": history['val_acc'][-1] if history['val_acc'] else 0,
+            "final_loss": history['val_loss'][-1] if history['val_loss'] else 0
+        }, f, indent=4)
+    print(f"Metrics saved to classification_metrics.json")
+
     # Loss Curve
     plt.figure()
     plt.plot(history['train_loss'], label='Train Loss')
