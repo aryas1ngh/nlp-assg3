@@ -11,15 +11,15 @@ from corpus_data import get_corpus_loaders
 
 # Hyperparameters
 CONTEXT_LENGTH = 256
-EMBED_DIM = 512
+EMBED_DIM = 256
 NUM_HEADS = 8
-NUM_LAYERS = 8
-FFN_DIM = 2048
+NUM_LAYERS = 6
+FFN_DIM = 1024
 DROPOUT = 0.1
 BATCH_SIZE = 32
-LEARNING_RATE = 6e-4
+LEARNING_RATE = 3e-4
 NUM_EPOCHS = 5
-STRIDE = 64
+STRIDE = 128
 OUTPUT_FILE = 'generated_text.txt'
 
 DEVICE = (
@@ -79,7 +79,7 @@ class FeedForward(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(embed_dim, ffn_dim),
-            nn.GELU(),
+            nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(ffn_dim, embed_dim),
             nn.Dropout(dropout),
@@ -194,30 +194,12 @@ class GPTLanguageModel(nn.Module):
 
         return idx
 
-# LR Scheduler
-def get_scheduler(optimizer, warmup_steps: int, total_steps: int):
-    def lr_lambda(step: int):
-        if step < warmup_steps:
-            return step / max(1, warmup_steps)
-        progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
-        return max(0.05, 0.5 * (1.0 + math.cos(math.pi * progress)))  # floor at 5% of peak LR
-    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
 # --- Training Loop ---
 def train(model: GPTLanguageModel, train_loader: DataLoader, val_loader: DataLoader,
           num_epochs: int = NUM_EPOCHS, lr: float = LEARNING_RATE):
-    total_steps   = num_epochs * len(train_loader)
-    warmup_steps  = min(500, total_steps // 20)   # ~5% warmup
-
-    # Separate weight decay: don't decay biases, LayerNorm, embeddings
-    decay_params     = [p for n, p in model.named_parameters() if p.requires_grad and p.dim() >= 2]
-    no_decay_params  = [p for n, p in model.named_parameters() if p.requires_grad and p.dim() < 2]
-    optimizer = torch.optim.AdamW(
-        [{'params': decay_params, 'weight_decay': 0.1},
-         {'params': no_decay_params, 'weight_decay': 0.0}],
-        lr=lr, betas=(0.9, 0.95)   # ← beta2=0.95 is standard for LMs
-    )
-    scheduler = get_scheduler(optimizer, warmup_steps, total_steps)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs * len(train_loader))
     model.to(DEVICE)
 
     all_metrics = {}
