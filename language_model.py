@@ -332,7 +332,7 @@ def main():
     generated = model.generate(prompt_tensor, args.gen_tokens, args.temperature, args.top_k)
     generated_text = decode(generated[0].tolist())
     print(f"Generated text:\n{generated_text}")
-    with open(OUTPUT_FILE, 'w') as f:
+    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
         f.write(generated_text)
     print(f"Generated text saved to {OUTPUT_FILE}.")
 

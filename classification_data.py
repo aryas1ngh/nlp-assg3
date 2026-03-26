@@ -11,7 +11,7 @@ from tokenizer import encode, PAD_ID, clean_text
 
 CSV_PATH = "text_classification_dataset/train.csv"
 MAX_LENGTH = 256
-TRAIN_RATIO = 0.9
+TRAIN_RATIO = 0.95
 RANDOM_SEED = 42
 
 TEXT_COL = 'text'
