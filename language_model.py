@@ -10,10 +10,10 @@ from tokenizer import vocab_size as get_vocab_size, decode, encode, BOS_ID
 from corpus_data import get_corpus_loaders
 
 # Hyperparameters
-CONTEXT_LENGTH = 256
+CONTEXT_LENGTH = 64
 EMBED_DIM = 256
-NUM_HEADS = 8
-NUM_LAYERS = 6
+NUM_HEADS = 4
+NUM_LAYERS = 4
 FFN_DIM = 1024
 DROPOUT = 0.1
 BATCH_SIZE = 32

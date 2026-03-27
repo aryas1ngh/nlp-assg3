@@ -153,7 +153,7 @@ def save_plots(history, output_dir='plots'):
 
 
 @torch.no_grad()
-def show_correct_samples(model, loader, num_samples=5):
+def show_correct_samples(model, loader, num_samples=5, output_file='correct_samples.txt'):
     model.eval()
     correct_samples = []
     label_map = {0: "Negative", 1: "Neutral", 2: "Positive"}
@@ -176,17 +176,18 @@ def show_correct_samples(model, loader, num_samples=5):
         if len(correct_samples) >= num_samples:
             break
             
-    print("\n--- 5 Correct Predictions ---")
-    with open('correct_samples.txt', 'w', encoding='utf-8') as f:
+    print(f"\n--- {num_samples} Correct Predictions ---")
+    with open(output_file, 'w', encoding='utf-8') as f:
         for i, sample in enumerate(correct_samples, 1):
             line = f"Sample {i}:\nText: {sample['text'][:200]}...\nPred: {sample['prediction']}\nLabel: {sample['label']}\n"
             print(line)
             f.write(line + "\n")
-    print("Correct samples saved to correct_samples.txt")
+    print(f"Correct samples saved to {output_file}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="GPT Sentiment Classifier")
+    parser.add_argument('--mode', type=str, default='train', choices=['train', 'eval'], help='Mode: train or eval')
     parser.add_argument('--epochs', type=int, default=NUM_EPOCHS)
     parser.add_argument('--batch_size', type=int, default=BATCH_SIZE)
     parser.add_argument('--lr', type=float, default=LEARNING_RATE)
@@ -197,7 +198,8 @@ def main():
     parser.add_argument('--ffn_dim', type=int, default=FFN_DIM)
     parser.add_argument('--dropout', type=float, default=DROPOUT)
     parser.add_argument('--load_lm', type=str, default='minigpt.pt', help='Pre-trained LM weights')
-    parser.add_argument('--save', type=str, default='gpt_classifier.pt')
+    parser.add_argument('--save', type=str, default='gpt_classifier.pt', help='Classifier weights file')
+    parser.add_argument('--output_file', type=str, default='correct_samples.txt', help='Output file for samples')
     args = parser.parse_args()
 
     # 1. Load Data
@@ -213,23 +215,34 @@ def main():
         dropout=args.dropout
     )
     
-    # 3. Load Backbone Weights
-    if os.path.exists(args.load_lm):
-        print(f"Loading pre-trained backbone from {args.load_lm}...")
-        lm_state = torch.load(args.load_lm, map_location=DEVICE)
-        # Extract only backbone weights
-        backbone_state = {k.replace('backbone.', ''): v for k, v in lm_state.items() if k.startswith('backbone.')}
-        model.backbone.load_state_dict(backbone_state)
+    if args.mode == 'train':
+        # 3. Load Backbone Weights
+        if os.path.exists(args.load_lm):
+            print(f"Loading pre-trained backbone from {args.load_lm}...")
+            lm_state = torch.load(args.load_lm, map_location=DEVICE)
+            # Extract only backbone weights
+            backbone_state = {k.replace('backbone.', ''): v for k, v in lm_state.items() if k.startswith('backbone.')}
+            model.backbone.load_state_dict(backbone_state)
+        else:
+            print("Warning: No pre-trained backbone found. Training from scratch.")
+
+        # 4. Train
+        print("Starting classification training...")
+        history = train_classifier(model, train_loader, val_loader, args.epochs, args.lr, args.save)
+
+        # 5. Save Plots
+        save_plots(history)
     else:
-        print("Warning: No pre-trained backbone found. Training from scratch.")
+        # Load full classifier weights (Backbone + Head)
+        if os.path.exists(args.save):
+            print(f"Loading classifier weights from {args.save} for evaluation...")
+            model.load_state_dict(torch.load(args.save, map_location=DEVICE))
+        else:
+            print(f"Error: Weights file {args.save} not found for eval mode.")
+            return
 
-    # 4. Train
-    print("Starting classification training...")
-    history = train_classifier(model, train_loader, val_loader, args.epochs, args.lr, args.save)
-
-    # 5. Save Plots & Sample Correct Predictions
-    save_plots(history)
-    show_correct_samples(model, val_loader)
+    # 6. Show Correct Samples (Demo)
+    show_correct_samples(model, val_loader, output_file=args.output_file)
 
 if __name__ == '__main__':
     main()
